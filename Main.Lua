@@ -167,23 +167,23 @@ local function createGridButton(text, order)
     btn.Font = Enum.Font.SourceSansBold
     btn.LayoutOrder = order
     btn.Parent = ButtonGrid
-    
+
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = btn
-    
+
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.fromRGB(45, 45, 45)
     stroke.Thickness = 1.2
     stroke.Parent = btn
-    
+
     return btn, stroke
 end
 
 local SpecButton, SpecStroke = createGridButton("Spectate", 1)
 local LoopButton, LoopStroke = createGridButton("Loop Tp", 2)
 local TPButton, TPStroke     = createGridButton("Tepear", 3)
-local KillButton, KillStroke = createGridButton("Kill", 4)
+local HighButton, HighStroke = createGridButton("Highlight", 4)
 
 -- ==========================================
 -- SECCIÓN DE ESPÍA DE INVENTARIO (TOOL SPY)
@@ -235,9 +235,9 @@ local function updateInventorySpy(player)
         InventoryLabel.Text = "Ninguno"
         return
     end
-    
+
     local toolNames = {}
-    
+
     local backpack = player:FindFirstChildOfClass("Backpack")
     if backpack then
         for _, item in ipairs(backpack:GetChildren()) do
@@ -246,7 +246,7 @@ local function updateInventorySpy(player)
             end
         end
     end
-    
+
     if player.Character then
         for _, item in ipairs(player.Character:GetChildren()) do
             if item:IsA("Tool") then
@@ -254,7 +254,7 @@ local function updateInventorySpy(player)
             end
         end
     end
-    
+
     if #toolNames > 0 then
         InventoryLabel.Text = table.concat(toolNames, ", ")
     else
@@ -263,23 +263,20 @@ local function updateInventorySpy(player)
 end
 
 local function updateTargetUI(player)
-    -- Incrementar sesión para romper el bucle anterior inmediatamente
     currentSpySession = currentSpySession + 1
     local mySession = currentSpySession
 
     if player then
         targetPlayer = player
         NameLabel.Text = player.DisplayName .. "\n(@" .. player.Name .. ")"
-        
-        -- Carga asíncrona de miniatura real sin trabar el hilo principal
+
         task.spawn(function()
             local content, ready = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size180x180)
             if currentSpySession == mySession then
                 AvatarImage.Image = content
             end
         end)
-        
-        -- Bucle seguro para refrescar inventario cada segundo
+
         task.spawn(function()
             while currentSpySession == mySession and targetPlayer == player do
                 updateInventorySpy(player)
@@ -291,7 +288,7 @@ local function updateTargetUI(player)
         NameLabel.Text = "Esperando objetivo..."
         AvatarImage.Image = "rbxassetid://0"
         InventoryLabel.Text = "Ninguno"
-        
+
         if loopTpConnection then
             loopTpConnection:Disconnect()
             loopTpConnection = nil
@@ -304,7 +301,7 @@ end
 TextBox:GetPropertyChangedSignal("Text"):Connect(function()
     local text = TextBox.Text:lower()
     if text == "" then updateTargetUI(nil) return end
-    
+
     local found = false
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
@@ -340,7 +337,7 @@ LoopButton.MouseButton1Click:Connect(function()
     else
         LoopButton.BackgroundColor3 = Color3.fromRGB(45, 5, 5)
         LoopStroke.Color = Color3.fromRGB(255, 0, 0)
-        
+
         loopTpConnection = RunService.Heartbeat:Connect(function()
             if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -382,24 +379,26 @@ SpecButton.MouseButton1Click:Connect(function()
     end
 end)
 
-KillButton.MouseButton1Click:Connect(function()
-    if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local tool = myChar:FindFirstChildOfClass("Tool") or LocalPlayer.Backpack:FindFirstChildOfClass("Tool")
-    if tool and myHRP then
-        tool.Parent = myChar
-        local oldCFrame = myHRP.CFrame 
-        myHRP.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame
-        task.wait(0.05)
-        firetouchinterest(targetPlayer.Character.HumanoidRootPart, tool.Handle, 0)
-        firetouchinterest(targetPlayer.Character.HumanoidRootPart, tool.Handle, 1)
-        targetPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, -9999, 0)
-        task.wait(0.1)
-        myHRP.CFrame = oldCFrame
+-- ==========================================
+-- LÓGICA HIGHLIGHT
+-- ==========================================
+local isHighlightEnabled = false
+local highlightInstance = nil
+
+HighButton.MouseButton1Click:Connect(function()
+    isHighlightEnabled = not isHighlightEnabled
+    if isHighlightEnabled then
+        HighButton.BackgroundColor3 = Color3.fromRGB(45, 5, 5)
+        HighStroke.Color = Color3.fromRGB(255, 0, 0)
+        if targetPlayer and targetPlayer.Character then
+            highlightInstance = Instance.new("Highlight")
+            highlightInstance.FillColor = Color3.fromRGB(255, 0, 0)
+            highlightInstance.FillTransparency = 0.5
+            highlightInstance.Parent = targetPlayer.Character
+        end
     else
-        KillStroke.Color = Color3.fromRGB(255, 0, 0)
-        task.wait(0.5)
-        KillStroke.Color = Color3.fromRGB(45, 45, 45)
+        HighButton.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
+        HighStroke.Color = Color3.fromRGB(45, 45, 45)
+        if highlightInstance then highlightInstance:Destroy() highlightInstance = nil end
     end
 end)
